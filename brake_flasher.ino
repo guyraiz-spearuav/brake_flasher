@@ -1,7 +1,22 @@
-#include <MPU6050_tockn.h>
-#include <Wire.h>
+#include <TinyWireM.h>
+#include <USI_TWI_Master.h>
 
-MPU6050 mpu6050(Wire);
+// Connect SDA and SDC (ATTINY85 physical pins 5 & 7) to the MPU6050 and the SSD1306 OLED Display
+// Connect Vcc/Gnd to MPU6050 and SSD1306 OLED Display  (if you are using the 128x64 display, comment out "setdisplay()"
+// If you only want to use Serial Monitor OR OLED display, comment out calls to libraries, functions and routines which you don't require
+//
+// Tom Donnelly 2018
+
+
+
+void get_accel(void);
+void get_gyro(void);
+void setup_MPU6050(void);
+
+int accelX, accelY, accelZ;
+int gyroX, gyroY, gyroZ;
+char mpu = 0x68;  // I2C address of MPU.  Connect 5V to pin ADO to use 0x69 address instead
+
 
 //void flash();
 
@@ -22,20 +37,10 @@ long unsigned long previousMillis = 0;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
-  Serial.begin(9600);
-  Wire.begin();
-  mpu6050.begin();
-  //  mpu6050.calcGyroOffsets(true);
 }
 
 void loop() {
-  mpu6050.update();
-
-  mpu6050.getAccX();
-  mpu6050.getAccY();
-  mpu6050.getAccZ();
-
-  float accel = mpu6050.getAccY() - ACCEL_OFFSET;
+  float accel = accelY - ACCEL_OFFSET;
   if (accel > MIN_G_REQ) {
     debounce_timer_off = millis();
   } else {
@@ -52,7 +57,6 @@ void loop() {
     led_state = 0;
   }
   analogWrite(LED_PIN, led_state);
-  Serial.println(led_state);
 }
 
 void flash() {
@@ -64,4 +68,51 @@ void flash() {
       led_state = MAX_BRIGHTNESS;
     }
   }
+}
+
+
+
+void setup_MPU6050() {
+  TinyWireM.begin();
+  // We need to do three things.  1. Disable sleep mode on the MPU (it activates on powerup).  2. Set the scale of the Gyro.  3. Set the scale of the accelerometer
+  // We do this by sending 2 bytes for each:  Register Address & Value
+  TinyWireM.beginTransmission(mpu);
+  TinyWireM.write(0x6B); //  Power setting address
+  TinyWireM.write(0b00000000); // Disable sleep mode (just in case)
+  TinyWireM.endTransmission();
+  TinyWireM.beginTransmission(mpu);
+  TinyWireM.write(0x1B); // Config register for Gyro
+  TinyWireM.write(0x00000000); // 250° per second range (defau<)
+  TinyWireM.endTransmission();
+  TinyWireM.beginTransmission(mpu); //I2C address of the MPU
+  TinyWireM.write(0x1C); // Accelerometer config register
+  TinyWireM.write(0b00000000); // 2g range +/- (defau<)
+  TinyWireM.endTransmission();
+}
+
+void get_accel() {
+  TinyWireM.beginTransmission(mpu); //I2C address of the MPU
+  TinyWireM.write(0x3B); //  Acceleration data register
+  TinyWireM.endTransmission();
+  TinyWireM.requestFrom(mpu, 6); // Get 6 bytes, 2 for each DoF
+  accelX = TinyWireM.read() << 8; // Get X upper byte first
+  accelX |= TinyWireM.read();     // lower
+  accelY = TinyWireM.read() << 8; // Get Y upper byte first
+  accelY |= TinyWireM.read();     // lower
+  accelZ = TinyWireM.read() << 8; // Get Z upper byte first
+  accelZ |= TinyWireM.read();     // lower
+}
+
+void get_gyro() {
+  TinyWireM.beginTransmission(mpu); //I2C address of the MPU
+  TinyWireM.write(0x43); // Gyro data register
+  TinyWireM.endTransmission();
+  TinyWireM.requestFrom(mpu, 6); // Get 6 bytes, 2 for each DoF
+  while (TinyWireM.available() < 6);
+  gyroX = TinyWireM.read() << 8; // Get X upper byte first
+  gyroX |= TinyWireM.read();     // lower
+  gyroY = TinyWireM.read() << 8; // Get Y upper byte first
+  gyroY |= TinyWireM.read();     // lower
+  gyroZ = TinyWireM.read() << 8; // Get Z upper byte first
+  gyroZ |= TinyWireM.read();     // lower
 }
