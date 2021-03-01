@@ -1,12 +1,6 @@
 #include <TinyWireM.h>
 #include <USI_TWI_Master.h>
-
-// Connect SDA and SDC (ATTINY85 physical pins 5 & 7) to the MPU6050 and the SSD1306 OLED Display
-// Connect Vcc/Gnd to MPU6050 and SSD1306 OLED Display  (if you are using the 128x64 display, comment out "setdisplay()"
-// If you only want to use Serial Monitor OR OLED display, comment out calls to libraries, functions and routines which you don't require
-//
-// Tom Donnelly 2018
-
+#include <EEPROM.h>
 
 
 void get_accel(void);
@@ -18,29 +12,47 @@ int gyroX, gyroY, gyroZ;
 char mpu = 0x68;  // I2C address of MPU.  Connect 5V to pin ADO to use 0x69 address instead
 
 
-//void flash();
 
+
+const int EEPROM_ADDRESS = 0;
 const int LED_PIN = 9;
 const int DEBOUNCE_DELAY_MS = 100;
 const float MIN_G_REQ = 0.2;
-const float ACCEL_OFFSET = 0.2;
 const float MAX_BRIGHTNESS_G = 0.5;
 const int LED_OFF = 0;
 const int MAX_BRIGHTNESS = 255;
 const int MIN_BRIGHTNESS = MAX_BRIGHTNESS / 3;
 const int INTERVAL = 50;
+const int ACCEL_OFFSET_DELAY = 500;
+const int ACCEL_OFFSET_BUTTON_PIN = 2;
+
+int accel_cal_run_once = 0;
+float accel_offset;
 
 float led_state = LED_OFF;
 long unsigned int debounce_timer_on;
 long unsigned int debounce_timer_off;
 long unsigned long previousMillis = 0;
 
+
+long unsigned long accel_offset_calculator_timer = 0;
+
+
+
 void setup() {
   pinMode(LED_PIN, OUTPUT);
 }
 
 void loop() {
-  float accel = accelY - ACCEL_OFFSET;
+  if (accel_cal_run_once == 0) {
+    accel_cal_run_once = digitalRead(ACCEL_OFFSET_BUTTON_PIN);
+  }
+  if (accel_cal_run_once == 1) {
+    update_offset();
+    accel_cal_run_once = 2;
+  }
+  EEPROM.get(EEPROM_ADDRESS, accel_offset);
+  float accel = accelY - accel_offset;
   if (accel > MIN_G_REQ) {
     debounce_timer_off = millis();
   } else {
@@ -115,4 +127,16 @@ void get_gyro() {
   gyroY |= TinyWireM.read();     // lower
   gyroZ = TinyWireM.read() << 8; // Get Z upper byte first
   gyroZ |= TinyWireM.read();     // lower
+}
+
+void update_offset() {
+  int counter = 0;
+  float accel_offset_calculator;
+  accel_offset_calculator_timer = millis();
+  while (millis() < accel_offset_calculator_timer + ACCEL_OFFSET_DELAY) {
+    get_accel();
+    accel_offset_calculator = + accelY;
+    counter ++;
+  }
+  EEPROM.put(EEPROM_ADDRESS, accel_offset_calculator / counter);
 }
