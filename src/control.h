@@ -2,5 +2,5 @@
 #define _CONTROL_H
 
 void control_setup();
-void value_from_mpu(float accel_y)
+void value_from_mpu(double accel_y)
 #endif

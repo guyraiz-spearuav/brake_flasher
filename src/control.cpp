@@ -11,12 +11,12 @@ const int MIN_ACCEL_REQUIRED = 0;
 const int MAX_ACCEL_REQUIRED = 500;
 const int INTERVAL = 250;
 
-float my_accel_y;
+double my_accel_y;
 int led_brightness;
-int flash_led_state = LOW;
-unsigned long previous_millis = 0;
+bool flash_led_state = LOW;
+unsigned long int previous_millis = 0;
 
-void value_from_mpu(float accel_y)
+void value_from_mpu(double accel_y)
 {
   my_accel_y = accel_y * 100;
   control_do();

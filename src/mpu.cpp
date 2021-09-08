@@ -6,7 +6,13 @@
 
 MPU6050 mpu6050(Wire);
 
-float accel_y;
+const int FILTER_TIME = 100;
+
+long unsigned int filter_timer = 0;
+long unsigned int filter_counter = 0;
+long double accumulated_accel_y;
+double accel_y;
+bool send_value;
 
 void mpu_setup()
 {
@@ -17,6 +23,16 @@ void mpu_setup()
 void mpu_get_acc()
 {
   mpu6050.update();
-  accel_y = mpu6050.getAccY();
+  send_value = millis() - FILTER_TIME > filter_timer;
+  if(!send_value){
+    accumulated_accel_y += mpu6050.getAccY();
+    filter_counter += 1;
+  } else {
+    accel_y = accumulated_accel_y / filter_counter;
+    accumulated_accel_y = 0;
+    filter_counter = 0;
+    filter_timer = millis();
+  }
+  
   value_from_mpu(accel_y);
 }
